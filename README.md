@@ -1,0 +1,57 @@
+
+# ECREA 2022 Programme
+
+<div>
+
+[![](https://img.shields.io/twitter/url/https/twitter.com/JohannesBGruber.svg?style=social&label=Follow%20%40JohannesBGruber)](https://twitter.com/JohannesBGruber)
+
+Twitter
+
+</div>
+
+<img src="meme.jpg" width="400" />
+
+If you are tired of scrolling through the [ECREA
+program](https://www.czech-in.org/cmPortalv15/Searchable/ecc22/config/nodetails#!sessionlist)
+or waiting for the page to load, this repo is for you.[^1]
+
+This repo contains the full programme as json, CSV and Excel file in the
+data folder and the [quarto file](ecrea.qmd) I used to scrape and tidy
+the data. I also selected the most important columns from this full data
+and this [Excel
+file](https://github.com/JBGruber/ecrea2022/raw/main/data/ecrea_presentations_short.xlsx)
+is what I would recommend you to search through:
+
+<div>
+
+[<img src="example.png" style="width:100.0%" />](https://github.com/JBGruber/ecrea2022/raw/main/data/ecrea_presentations_short.xlsx)
+
+</div>
+
+## Finding my Twitter friends in the programme
+
+I always look for a couple of keywords in the programme to find the
+presentations I’m most interested in. But conferences are, of course,
+also the place to network and meet academia friends after two years only
+seeing each other online :smiley:. So another good way to navigate the
+programme is to look for people I follow on Twitter in the programme:
+
+``` r
+library(rtweet)
+library(glue)
+# look up friends
+friends <- rtweet::get_friends("JohannesBGruber") %>% # enter your Twitter handle here
+  dplyr::pull(to_id) %>%
+  rtweet::lookup_users() %>% 
+  pull(name) %>% 
+  toString()
+
+presentations <- rio::import("data/ecrea_presentations_short.xlsx")
+
+presentations %>% 
+  filter(str_detect(friends, glue("\\b{presentation_FirstName}\\b")),
+         str_detect(friends, glue("\\b{presentation_LastName}\\b")))
+```
+
+[^1]: idea nicked from [benjaminguinaudeau’s APSA
+    repo](https://github.com/benjaminguinaudeau/apsa2022).

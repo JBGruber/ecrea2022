@@ -1,0 +1,81 @@
+---
+title: "Get ECREA 2022 Program in tabular form"
+author: "Johannes B. Gruber"
+date: "2022-10-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Get programme via curl request
+
+I copied the curl call from my browser while loading the [programme website]() (token and cookies redacted). This results in a json file with all data.
+
+```{bash}
+#| eval: false
+curl 'https://www.czech-in.org/cmsearchableprogrammev15/conferencemanager/CM_W3_SearchableProgram/api/persionid/0002245230/type/normal/getfilteredsessions/conference/ecc22' \
+  -H 'Accept: */*' \
+  -H 'Accept-Language: en-GB,en;q=0.9,de-DE;q=0.8,de;q=0.7,en-US;q=0.6' \
+  -H 'Authorization: Bearer {REDACTED}' \
+  -H 'Connection: keep-alive' \
+  -H 'Content-Type: application/json; charset=UTF-8' \
+  -H 'Cookie: {REDACTED}' \
+  -H 'Origin: https://www.czech-in.org' \
+  -H 'Referer: https://www.czech-in.org/cmPortalv15/Searchable/ecc22/config/nodetails' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -H 'covr-cmhost-customer: ecc22' \
+  -H 'covr-cmhost-function: nodetails' \
+  -H 'sec-ch-ua: "Not;A=Brand";v="99", "Chromium";v="106"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  --data-raw '{"model":"{\"filterbySessionTypeIds\":[],\"filterbyTrackIds\":[],\"filterbyFunctionTypeIds\":[],\"filterbyKeywordsIds\":[],\"searchWordsInSessionObjectives\":\"\",\"searchWordsInSubject\":\"\",\"searchContactOrAuthorName\":\"\",\"searchWordsInAbstractTitleOrText\":\"\",\"searchCatalogOrPresentationNumber\":\"\",\"searchOtherKeywords\":\"\",\"isMyItineraryEnabled\":false,\"isMyFavouritesEnabled\":false}","key":""}' \
+  --compressed > "data/ecrea.json"
+```
+
+If you want to rerun the call, open the network tab after right clicking the site and selecting *Inspect*, and copy the call name "ecc22".
+It should look the same as above.
+
+To parse the data, I stream the json into R and proceed to bring it into a simple tabular format.
+
+```{r message=FALSE}
+library(jsonlite)
+library(tidyverse)
+
+data <- stream_in(file("data/ecrea.json"))
+presentations <- data[[1]][[1]][["presentations"]] %>% 
+  bind_rows()
+
+data_clean <- data[[1]][[1]] %>% 
+  select(-presentations) %>% 
+  left_join(presentations, by = c("@id" = "linkedSessionId"), 
+            suffix = c("_session", "_presentation")) %>% 
+  mutate(authors = str_remove_all(formattedCoAuthors, "<[^>]*>")) %>% 
+  select(-abstractKeywords) # is empty and causes trouble with csvs
+glimpse(data_clean)
+```
+
+The full data is a little annoying to look at with 52 columns. Let's select only the interesting ones:
+
+```{r}
+data_clean_select <- data_clean %>% 
+  select(session_id = "@id", session_type = sessionTypeDescription, session_description = description,
+         session_track = trackDescription, session_room = roomName, start_session, end_session,
+         presentation_LastName = personLastName, presentation_FirstName = personFirstName, 
+         presentation_authors = authors, presentation_title = subject, 
+         start_presentation, end_presentation)
+```
+
+Now we can export it:
+
+```{r}
+rio::export(data_clean, "data/ecrea_presentations.csv")
+rio::export(data_clean, "data/ecrea_presentations.xlsx")
+rio::export(data_clean_select, "data/ecrea_presentations_short.csv")
+rio::export(data_clean_select, "data/ecrea_presentations_short.xlsx")
+```
